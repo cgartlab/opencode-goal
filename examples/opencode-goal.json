@@ -1,5 +1,5 @@
 {
   "evaluatorModel": { "providerID": "anthropic", "id": "claude-haiku-4-5" },
-  "maxTurns": 10,
-  "noProgressLimit": 3
+  "noProgressLimit": 3,
+  "evidenceWindow": 6
 }

@@ -5,6 +5,24 @@
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-17
+
+### Added
+
+- 生命周期命令：`/goal pause` / `resume` / `clear`；再次 `/goal <条件>` 直接替换旧目标（对齐 Claude `/goal` 与 Codex Goals）。
+- 目标状态持久化（`ctx.storage`）：热重载/重启不丢，恢复后置为暂停，等待用户消息或 `/goal resume` 再续跑。
+- 无进展检测与预算耗尽改为「暂停（保留目标）」并注入「总结卡点/下一步」提示，而非直接结束。
+- 条件长度校验（≤ 4000 字符）。
+- 失败分档：不可恢复错误（认证 / 余额 / 上下文溢出 / 模型不可用）自动清除目标。
+- 压缩保护：目标条件追加进上下文压缩摘要（尽力而为，不接管压缩）。
+
+### Changed
+
+- 默认不再设轮数上限（`maxTurns` 默认 0 = 不设限），可用 `--turns` / `--mins` / `maxTurns` 显式限界。
+- 循环推进改用 `session.synthetic` + `delivery:"steer"`（不再伪造用户消息；修正此前「用 prompt 而非 synthetic」的实现笔记——synthetic 需显式 `steer` 投递才可靠）。
+- 进程内 `globalThis` 单例共享状态，抵御 watcher 重载风暴导致的实例并存。
+- 评估证据窗口可配置（`evidenceWindow`，默认 6）。
+
 ## [0.1.0] - 2026-10-16
 
 ### Added

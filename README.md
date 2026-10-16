@@ -4,7 +4,7 @@
 
 > A goal-oriented auto-iteration loop plugin for OpenCode V2.
 > You set a completion condition; an independent evaluator model judges it after every turn and keeps the session working until it's met (or judged impossible / out of budget).
-> Distinct features: three-tier configuration, no hard-coded model, and implementation notes verified against the real OpenCode V2 runtime.
+> Distinct features: three-tier configuration, no hard-coded model, persisted goal state (survives restart), and implementation notes verified against the real OpenCode V2 runtime.
 
 ## 它解决什么问题
 
@@ -30,29 +30,36 @@ ln -s "$(pwd)/opencode-goal/src/index.ts" \
 ## 用法
 
 ```
-/goal <条件>          启动循环
-/goal                 查看状态（轮次 / 条件 / 最近评估）
-/goal stop            停止（clear / cancel / off / reset / none / abort 同义）
-/goal help            用法说明
-/goal --turns 5 <条件>   限制最多 5 轮
+/goal <条件>          启动循环（已有目标则替换）
+/goal                 查看状态（条件 / 状态 / 轮次 / 最近评估 / 历史达成）
+/goal pause           暂停（保留目标）
+/goal resume          恢复
+/goal clear           清除（stop / off / reset / none / cancel 同义）
+/goal help            用法说明与条件模板
+/goal --turns 5 <条件>   限制最多 5 轮（默认不设限）
 /goal --mins 30 <条件>   限制最多 30 分钟
 ```
 
-一个会话同时只有一个目标；重复启动会被拒绝，需先 `stop`。
+一个会话同时只有一个目标：再次 `/goal <条件>` 会**替换**当前目标；`pause` 后目标保留，`resume` 继续。目标状态会**持久化**，热重载或重启后从磁盘恢复（恢复后为暂停态，等你发消息或 `resume` 再续跑）。
 
 ### 条件怎么写（决定成败）
 
-评估器**只读对话里出现过的证据**，不自己跑命令。所以条件要写成"agent 的输出能证明"的形式：
+评估器**只读对话里出现过的证据**，不自己跑命令。所以条件要写成"agent 的输出能证明"的形式（参考 Codex 完成契约的六要素，按需取舍）：
 
 | 要素 | 说明 | 例 |
 |---|---|---|
-| 可测量的终态 | 测试结果 / 退出码 / 文件数 / 队列空 | `npm test 退出码为 0` |
-| 明确的检查方式 | agent 该如何证明 | `运行 npm test 并把输出贴出来` |
-| 不可变的约束 | 途中不能改变的东西 | `不得修改其他测试文件` |
+| ① 结果 | 完成时什么为真（可测量） | `p95 延迟 < 120ms` / `npm test 退出码为 0` |
+| ② 验证方式 | 怎么证明 | `运行 npm test 并把输出贴出来` |
+| ③ 约束 | 途中什么不能变 | `不得修改其他测试文件` |
+| ④ 边界 | 能碰哪些、不能碰哪些 | `只改 checkout 服务` |
+| ⑤ 迭代策略 | 每轮记录什么、下轮试什么 | `记录失败用例与下一步尝试` |
+| ⑥ 卡点条件 | 卡住时停并报告什么 | `若无法复现，停下报告证据与所需输入` |
 
-**好**：`/goal 让 test/auth 下所有测试通过，用 npm test 输出证明；不得修改其他测试文件`
+**好**：`/goal 让 test/auth 下所有测试通过，用 npm test 输出证明；不得修改其他测试文件；每轮记录失败用例与下一步尝试；若无法复现则停下报告证据与所需输入`
 
-**差**：`/goal 改进一下认证代码` —— 没有终态，会空转到轮数上限。
+**差**：`/goal 改进一下认证代码` —— 没有终态，评估器无从判断，会一直推进。
+
+条件上限 4000 字符（对齐 Claude `/goal`）。
 
 ## 配置
 
@@ -61,8 +68,10 @@ ln -s "$(pwd)/opencode-goal/src/index.ts" \
 | 项 | 类型 | 默认 | 说明 |
 |---|---|---|---|
 | `evaluatorModel` | `{ providerID, id }` | 不指定 | 评估器模型；缺省则用 OpenCode 默认模型 |
-| `maxTurns` | number | 10 | 轮数上限 |
-| `noProgressLimit` | number | 3 | 连续无工具轮数达此值判为无进展并停止 |
+| `maxTurns` | number | 0 | 轮数上限；**0 = 不设限**，>0 则生效 |
+| `noProgressLimit` | number | 3 | 连续无工具轮数达此值判为无进展并暂停 |
+| `maxConditionLength` | number | 4000 | 条件最大字符数（对齐 Claude /goal） |
+| `evidenceWindow` | number | 6 | 评估证据取最近几条 assistant 输出 |
 | `logFile` | string | `~/.local/state/opencode-goal/goal.log` | 日志路径；`"off"` 关闭 |
 
 配置文件示例：
@@ -70,9 +79,12 @@ ln -s "$(pwd)/opencode-goal/src/index.ts" \
 ```json
 {
   "evaluatorModel": { "providerID": "anthropic", "id": "claude-haiku-4-5" },
-  "maxTurns": 10
+  "noProgressLimit": 3,
+  "evidenceWindow": 6
 }
 ```
+
+（需要硬轮数上限时，加 `"maxTurns": 10` 即可。）
 
 环境变量（模型格式 `providerID/modelID`，模型 ID 可含 `/`）：
 
@@ -106,7 +118,7 @@ export OPENCODE_GOAL_LOG_FILE="~/goal.log"
    └─ not_met    → 把评估理由作为下一轮指引注入 → 回到执行一轮
 ```
 
-**终止条件**：目标达成 / 判定不可能 / 达到轮数或时间上限 / 连续无进展 / 你按 Esc / `/goal stop`。
+**终止 / 暂停条件**：目标达成（✓） / 判定不可能（✗） / 达到轮数或时间上限（**暂停**，保留目标） / 连续无进展（**暂停**） / 你按 Esc（暂停） / `/goal clear`（清除）。
 
 **安全**：插件不改变权限规则。需要确认的操作照常弹确认；要无人值守请自行配合 auto mode。
 
@@ -114,7 +126,7 @@ export OPENCODE_GOAL_LOG_FILE="~/goal.log"
 
 以下结论均在本机 OpenCode V2 上实测得出，部分与官方文档的表述不同：
 
-1. **推进循环要用 `session.prompt`，不要用 `session.synthetic`。** synthetic 在会话 idle 时入队 inbox 后，存在不被立即拉取的窗口——实测消息会滞留在队列里，直到下一次外部消息才被消费（表现为"结论消息不出现、循环停住"）。`session.prompt`（user 输入语义）总是立即触发执行。synthetic 更适合不需要立即行动的旁路通知。
+1. **循环推进用 `session.synthetic` + `delivery:"steer"`**（实测可靠，且不伪造用户消息）。踩过的坑：synthetic **不指定 delivery**（默认入队语义）时，idle 会话存在"入队但不被立即拉取"的窗口，消息滞留到下一次外部消息才被消费（表现为"结论不出现、循环停住"）。显式传 `delivery: "steer"` 后立即触发执行。`session.prompt`（user 语义）也能推进，但会在转录里留下伪造的用户消息，且无法与真实用户输入区分。
 2. **`ctx.model.list()` 返回 `{ location, data }` 对象，不是数组**，模型列表在 `data`。
 3. **插件事件流是全服务广播**，且同一事件会被重复投递——需按 `event.data.sessionID` 过滤目标会话，并**按 `event.id` 去重**（否则一次 idle 会触发多次评估与注入）。
 4. **`ctx.generate.text` 的 `model` 可省略**（OpenAPI 中为 `Model.Ref | null`），省略时用默认模型。
@@ -123,11 +135,12 @@ export OPENCODE_GOAL_LOG_FILE="~/goal.log"
 
 ## 已知限制
 
-- **防空转**：连续无工具轮数的停止路径未做端到端复现（设计"条件不可达且 agent 不用工具"的场景时，agent 要么满足了条件、要么自己去用工具，本身是合理行为）。逻辑简单，已代码审查。
-- **Esc 中断**：事件处理已实现（`session.execution.interrupted`），但未在真实 TUI 中人工验证。
-- **终态多一轮**：结束/状态类消息以用户消息注入，会触发一次模型的简短确认回复（多花一次廉价调用），换来结论必然可见。
-- **状态在内存中**：重启 OpenCode 后进行中的目标状态丢失（不会自动恢复循环）。
-- **单会话单目标**。
+- **防空转**：连续无工具轮数触发**暂停**的路径未做端到端复现（设计"条件不可达且 agent 不用工具"的场景时，agent 要么满足了条件、要么自己去用工具，本身是合理行为）。逻辑简单，已代码审查；触发后为暂停（保留目标）而非终态。
+- **无默认轮数上限**：对齐 Claude `/goal`（默认不设限），靠无进展检测 + 可选的 `--mins` / `--turns` / `maxTurns` 兜底。若条件写得让模型能一直"用工具但永不满足"，循环可能持续很久——需要时请显式设限。
+- **Esc 中断**：事件处理已实现（`session.execution.interrupted` → 暂停），但未在真实 TUI 中人工验证。
+- **恢复后暂停**：从磁盘恢复的目标**有意置为暂停**（热重载/重启不自动续跑），等你在该会话发消息或 `/goal resume` 才继续。
+- **终态多一轮**：结束/状态类消息以 synthetic 注入，会触发一次模型的简短确认回复（多花一次廉价调用），换来结论必然可见。
+- **单会话单目标**（再次 `/goal` 替换，不叠加）。
 
 ## License
 
