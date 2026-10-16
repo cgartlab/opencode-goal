@@ -1,0 +1,34 @@
+{
+  "name": "opencode-goal",
+  "version": "0.1.0",
+  "description": "Goal-oriented auto-iteration loop for OpenCode: keep working until a condition is met (Claude Code /goal style).",
+  "type": "module",
+  "license": "MIT",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": [
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "opencode",
+    "opencode-plugin",
+    "goal",
+    "loop",
+    "agent",
+    "autonomous"
+  ],
+  "peerDependencies": {
+    "@opencode/plugin": ">=2"
+  },
+  "devDependencies": {
+    "@opencode/plugin": "^2.0.30",
+    "@types/node": "^22",
+    "typescript": "^5"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  }
+}

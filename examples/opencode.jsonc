@@ -1,0 +1,15 @@
+// 安装方式一：npm 包（发布后）
+// 在 opencode.json(c) 中注册插件，可选地用 options 覆盖默认配置
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugins": [
+    {
+      "package": "opencode-goal",
+      "options": {
+        "evaluatorModel": { "providerID": "anthropic", "id": "claude-haiku-4-5" },
+        "maxTurns": 10,
+        "noProgressLimit": 3
+      }
+    }
+  ]
+}
