@@ -1,6 +1,6 @@
 {
   "name": "opencode-goal",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Goal-oriented auto-iteration loop for OpenCode: keep working until a condition is met (Claude Code /goal style).",
   "type": "module",
   "license": "MIT",

@@ -36,10 +36,11 @@ npm run typecheck    # tsc --noEmit，提交前必须零错误
 - **提交信息用 Conventional Commits**：`<type>(<scope>): <description>`。正文讲 **WHY**（diff 已说明 WHAT）。
 - **分支命名**：`feature/xxx`、`fix/xxx`、`docs/xxx` 一类前缀式（勿直接提交到 `main`）。
 - **改插件前先读 `README.md` 的「实现笔记」**：那里记录了实测得出的 OpenCode V2 行为约束
-  （如用 `session.prompt` 而非 `session.synthetic`、事件需按 `sessionID` 过滤并按 `event.id` 去重），
-  照着改能避开已知坑。
+  （如循环推进用 `session.synthetic` + `delivery:"steer"`、事件需按 `sessionID` 过滤并按 `event.id` 去重、
+  文件变更会触发多次热重载），照着改能避开已知坑。
 
 ## 安全与边界
 
 - 插件不改变 OpenCode 的权限规则；需要确认的操作照常弹确认。
-- 插件状态存内存，重启丢失——这是已知设计取舍，改动前先读 README「已知限制」。
+- 目标状态经 `ctx.storage` 持久化（热重载/重启不丢，恢复后置为暂停）；
+  改插件前先读 README「已知限制」。
