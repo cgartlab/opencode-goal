@@ -1,5 +1,9 @@
 # opencode-goal
 
+[![Release](https://img.shields.io/github/v/release/cgartlab/opencode-goal)](https://github.com/cgartlab/opencode-goal/releases)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![OpenCode plugin](https://img.shields.io/badge/OpenCode-plugin-5B8DEF)](https://opencode.ai)
+
 一个 OpenCode V2 插件：**给一个目标条件，agent 自动迭代直到条件满足**——Claude Code `/goal` 思路的开源实现。
 
 > A goal-oriented auto-iteration loop plugin for OpenCode V2.
@@ -145,6 +149,17 @@ export OPENCODE_GOAL_LOG_FILE="~/goal.log"
 - **终态多一轮**：结束/状态类消息以 synthetic 注入，会触发一次模型的简短确认回复（多花一次廉价调用），换来结论必然可见。
 - **单会话单目标**（再次 `/goal` 替换，不叠加）。
 - **完成承诺靠模型自律**：`--promise` 命中即判达成、跳过评估器。模型若在条件未满足时输出承诺串会被误判完成——这是有意取舍（省一次评估），条件请写得让模型无法"以为完成"。
+
+## 版本与发布
+
+- 语义化版本：`feat` → minor，`fix` → patch；无对外行为变化不 bump。
+- 版本承载：`package.json` / `package-lock.json`；更新记录 `CHANGELOG.md`（Keep a Changelog）。
+- 发布流程（自动化，见 `.github/workflows/release.yml`）：
+  1. 合并含版本 bump 的 PR（代码 + CHANGELOG 同步）。
+  2. 仓库 **Actions → Release → Run workflow**，填版本号（如 `0.4.0`）。
+  3. workflow 自动打 tag `v0.4.0`，随即触发 Release：从 `CHANGELOG.md` 提取该版本条目并创建 GitHub Release。
+- 自动标签（`.github/workflows/labeler.yml`）：`feature/*` → feat、`fix*` → fix、`docs*`/`**/*.md` → docs、`chore*` → chore、`.github/**` → infra。
+- Issue / PR 模板：`.github/ISSUE_TEMPLATE/`、`.github/pull_request_template.md`。
 
 ## License
 

@@ -1,0 +1,13 @@
+# 自动标签规则：分支名 + 改动文件（labeler action 配置）
+# 依赖仓库中已存在的 labels：feat / fix / docs / chore / infra（见仓库设置）
+feat:
+  - head-branch: ["^feat", "^feature"]
+fix:
+  - head-branch: ["^fix"]
+docs:
+  - head-branch: ["^docs"]
+  - changed-files: ["**/*.md"]
+chore:
+  - head-branch: ["^chore"]
+infra:
+  - changed-files: [".github/**", ".gitignore", "package.json", "package-lock.json", "tsconfig.json"]

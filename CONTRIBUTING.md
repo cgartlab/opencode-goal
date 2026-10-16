@@ -33,9 +33,15 @@ ln -s "$(pwd)/src/index.ts" ~/.config/opencode/plugins/opencode-goal/index.ts
 
 ## 提交 PR
 
-1. 从 `main` 切出分支（`feature/xxx`、`fix/xxx`、`docs/xxx`）。
+1. 从 `main` 切出分支（`feature/xxx`、`fix/xxx`、`docs/xxx` 等前缀会触发自动标签）。
 2. 一个 PR 一个意图；纯文档 / 修复 / 新功能尽量拆开。
-3. PR 描述写清：改了什么、为什么、怎么验证的。
+3. PR 描述模板自动填充（`.github/pull_request_template.md`），写清改了什么、为什么、怎么验证的。
+4. 提交信息用 Conventional Commits——它同时决定自动标签与版本号（`feat`→minor、`fix`→patch）。
+
+## 版本与 Release
+
+- 版本号：`package.json` / `package-lock.json` 同步 bump；`CHANGELOG.md` 加对应条目（Keep a Changelog）。
+- 合并后发布：仓库 Actions → Release → Run workflow → 填版本号，自动打 tag 并创建 GitHub Release（body 取自 CHANGELOG 条目）。详见 README「版本与发布」。
 
 ## 不要做的事
 

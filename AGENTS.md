@@ -16,7 +16,10 @@ opencode-goal/
 ├── tsconfig.json       # 仅用于类型检查（noEmit）
 ├── README.md           # 用户文档（中文为主 + 英文摘要）
 ├── CHANGELOG.md        # 更新记录（Keep a Changelog）
-└── examples/           # 配置示例
+├── CONTRIBUTING.md     # 人类贡献指引
+├── AGENTS.md           # 本文件
+├── examples/           # 配置示例
+└── .github/            # issue/PR 模板 + 自动标签/发布 workflow
 ```
 
 ## 命令
@@ -44,3 +47,10 @@ npm run typecheck    # tsc --noEmit，提交前必须零错误
 - 插件不改变 OpenCode 的权限规则；需要确认的操作照常弹确认。
 - 目标状态经 `ctx.storage` 持久化（热重载/重启不丢，恢复后置为暂停）；
   改插件前先读 README「已知限制」。
+
+## 版本与 Release（给维护的 agent）
+
+- **版本语义**：`feat` → minor、`fix` → patch；无对外行为变化不 bump。版本文件 `package.json` + `package-lock.json`，更新记录 `CHANGELOG.md`（Keep a Changelog）。
+- **提交规约**：Conventional Commits（`<type>(<scope>): <desc>`），它同时驱动 `.github/workflows/labeler.yml` 的自动标签与版本语义。
+- **发布流程（自动化）**：合并含 bump 的 PR 后，走仓库 Actions → Release → Run workflow 填版本号 → 自动 tag `vN` + 创建 GitHub Release（body 取自 CHANGELOG 条目）。**push tag / 触发 release 是远程不可逆动作，先向用户确认**。
+- **改动 `.github/` 前**：先读对应 workflow 与模板，保持 yaml 语法可用（本机用 `ruby -e 'require "yaml"; YAML.load_file(...)'` 校验）。

@@ -1,0 +1,22 @@
+name: Feature request
+description: 建议新功能
+title: "feat: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: motivation
+    attributes:
+      label: 动机 / 场景
+      description: 想解决什么问题、在什么场景下需要
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 建议方案
+      description: 行为、命令、配置项如何变化
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: 验收标准（可选）
+      description: 满足什么算完成（可测量）
