@@ -16,32 +16,16 @@ OpenCode 的一轮对话结束时，agent 会把控制权交回给你。复杂�
 
 ## 安装
 
-### 方式一：本地插件目录（已验证）
-
-OpenCode V2 会自动加载 `~/.config/opencode/plugins/` 下的插件（目录内含 `index.ts`，也支持符号链接）。
+OpenCode V2 会自动加载 `~/.config/opencode/plugins/` 下的插件（目录内含 `index.ts`，也支持符号链接）：
 
 ```sh
-git clone <repo-url> ~/Documents/github-repos/opencode-goal
+git clone https://github.com/cgartlab/opencode-goal.git
 mkdir -p ~/.config/opencode/plugins/opencode-goal
-ln -s ~/Documents/github-repos/opencode-goal/src/index.ts \
+ln -s "$(pwd)/opencode-goal/src/index.ts" \
       ~/.config/opencode/plugins/opencode-goal/index.ts
 ```
 
 或直接把 `src/index.ts` 复制过去。改源码后 OpenCode 会热重载插件，无需重启。
-
-### 方式二：作为 npm 包（需先发布，未验证）
-
-发布到 npm 后写入配置：
-
-```jsonc
-// opencode.jsonc
-{
-  "$schema": "https://opencode.ai/config.json",
-  "plugins": ["opencode-goal"]
-}
-```
-
-> 说明：`plugins` 数组引用包名/本地目录的形式**未在本项目验证**（本项目当前未发布 npm）。已实测可用的是方式一。
 
 ## 用法
 
