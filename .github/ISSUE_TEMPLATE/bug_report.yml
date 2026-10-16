@@ -1,0 +1,29 @@
+name: Bug report
+description: 提交插件的问题报告
+title: "bug: "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: describe
+    attributes:
+      label: 问题描述
+      description: 发生了什么？期望什么？
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: 复现步骤
+      description: 最小可复现的命令 / 操作序列（含 /goal 条件原文）
+      render: shell
+  - type: textarea
+    id: env
+    attributes:
+      label: 环境
+      description: OpenCode 版本、插件版本（/goal 状态可见）、模型
+  - type: textarea
+    id: logs
+    attributes:
+      label: 日志
+      description: 相关日志，如 ~/.local/state/opencode-goal/goal.log 的尾部
+      render: shell

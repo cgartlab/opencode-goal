@@ -1,0 +1,16 @@
+name: Labeler
+on:
+  pull_request_target:
+    types: [opened, synchronize]
+jobs:
+  label:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: 按分支名与改动文件自动打标签
+        uses: actions/labeler@v5
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          configuration-path: .github/labeler.yml
