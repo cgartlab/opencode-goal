@@ -22,6 +22,7 @@
  *  /goal <condition>                 启动 / 替换
  *  /goal                             查看状态
  *  /goal pause|resume|clear|help     生命周期与帮助（clear 的别名 stop/off/reset/none/cancel）
+ *  /goal --promise TOKEN <condition>  完成承诺串：模型输出它（精确包含）即判达成（v0.3.0）
  *
  * 配置（优先级：plugin options > ~/.config/opencode-goal.json > 环境变量）：
  *    evaluatorModel   评估器模型 { providerID, id }；缺省则不指定模型
@@ -167,6 +168,7 @@ interface GoalState {
   turns: number // 已注入的迭代轮数（已评估轮次）
   maxTurns: number // 0 = 不设上限
   maxMinutes: number | null
+  promise: string | null // 完成承诺 token；模型输出该串（精确包含）即快速判 met
   startedAt: number
   phase: Phase
   lastReason: string
@@ -180,6 +182,7 @@ interface PersistedGoal {
   turns: number
   maxTurns: number
   maxMinutes: number | null
+  promise: string | null
   startedAt: number
   phase: Phase
   lastReason: string
@@ -219,10 +222,11 @@ const UNRECOVERABLE_KEYWORDS = [
 function parseStart(
   text: string,
   defaultMaxTurns: number,
-): { condition: string; maxTurns: number; maxMinutes: number | null } {
+): { condition: string; maxTurns: number; maxMinutes: number | null; promise: string | null } {
   let t = text.trim()
   let maxTurns = defaultMaxTurns
   let maxMinutes: number | null = null
+  let promise: string | null = null
   const turns = t.match(/--turns?\s+(\d+)/i)
   if (turns) {
     maxTurns = Math.max(1, Math.min(500, Number(turns[1])))
@@ -233,7 +237,12 @@ function parseStart(
     maxMinutes = Math.max(1, Number(mins[1]))
     t = t.replace(/--(?:max-)?minutes?\s+\d+/i, "")
   }
-  return { condition: t.trim(), maxTurns, maxMinutes }
+  const pm = t.match(/--promise\s+(?:"([^"]*)"|'([^']*)'|(\S+))/i)
+  if (pm) {
+    promise = (pm[1] ?? pm[2] ?? pm[3]) || null
+    t = t.replace(/--promise\s+(?:"[^"]*"|'[^']*'|\S+)/i, "")
+  }
+  return { condition: t.trim(), maxTurns, maxMinutes, promise }
 }
 
 /** 取最近若干条 assistant 消息的正文，并判断最近一轮是否调用了工具 */
@@ -300,6 +309,7 @@ export default Plugin.define({
         turns: g.turns,
         maxTurns: g.maxTurns,
         maxMinutes: g.maxMinutes,
+        promise: g.promise,
         startedAt: g.startedAt,
         phase: g.phase,
         lastReason: g.lastReason,
@@ -347,6 +357,7 @@ export default Plugin.define({
             turns: raw.turns ?? 0,
             maxTurns: raw.maxTurns ?? config.maxTurns,
             maxMinutes: raw.maxMinutes ?? null,
+            promise: raw.promise ?? null,
             startedAt: raw.startedAt ?? Date.now(),
             phase: "paused", // 有意偏离官方：恢复不自动续跑，等用户消息或 resume
             lastReason: raw.lastReason ?? "",
@@ -469,6 +480,16 @@ export default Plugin.define({
         const evidence = texts.join("\n\n---\n\n") || "（本轮没有可用的文字输出）"
         log(`evidenceLen=${evidence.length} usedTool=${usedTool}`)
 
+        // 完成承诺快通道：模型输出了承诺串（精确包含）→ 直接判达成，省一次 evaluator 调用
+        if (g.promise && evidence.includes(g.promise)) {
+          log(`promise hit session=${sessionID} token=${g.promise}`)
+          const done = setPhase(sessionID, "done", "完成承诺已输出")
+          if (done) {
+            await inject(sessionID, `✓ /goal 目标达成（完成承诺已输出）。条件：${done.condition}`)
+          }
+          return
+        }
+
         // 评估
         const verdict = await evaluate(g.condition, evidence)
         g.lastReason = verdict.reason
@@ -524,6 +545,7 @@ export default Plugin.define({
             `〔/goal 第 ${g.turns} 轮〕继续推进，直到条件满足。`,
             `目标条件：${g.condition}`,
             `评估反馈（未满足）：${verdict.reason}`,
+            g.promise ? `当且仅当条件真正满足时，单独一行输出：${g.promise}（不得为脱身谎报）。` : "",
             "请继续工作：读取文件、运行命令、修改代码均可，用可验证的证据证明条件已满足。",
             g.maxTurns > 0 ? `（本轮数上限 ${g.maxTurns} 轮）` : "",
           ]
@@ -675,6 +697,7 @@ export default Plugin.define({
                 "  /goal clear          清除（stop/off/reset/none/cancel 同义）",
                 "  /goal --turns N      限制最多 N 轮（默认不设限）",
                 "  /goal --mins M       限制最多 M 分钟",
+                "  /goal --promise T    完成承诺串：模型输出它（精确包含）即判达成，省一次评估",
                 "",
                 "条件模板（六要素，按需取舍）：",
                 "  ①结果：完成时什么为真（可测量）  ②验证：怎么证明（命令输出/测试结果/文件）",
@@ -718,8 +741,11 @@ export default Plugin.define({
                 [
                   `▶ /goal 已恢复。继续推进，直到条件满足：`,
                   existing.condition,
+                  existing.promise ? `当且仅当条件真正满足时，单独一行输出：${existing.promise}（不得为脱身谎报）。` : "",
                   `最近评估：${existing.lastReason || "（尚无评估）"}`,
-                ].join("\n"),
+                ]
+                  .filter(Boolean)
+                  .join("\n"),
               )
             } else if (existing && existing.phase === "running") {
               await inject(sessionID, "〔/goal〕目标正在进行中，无需恢复。")
@@ -744,7 +770,7 @@ export default Plugin.define({
           }
 
           // 设 / 替换目标
-          const { condition, maxTurns, maxMinutes } = parseStart(text, config.maxTurns)
+          const { condition, maxTurns, maxMinutes, promise } = parseStart(text, config.maxTurns)
           if (!condition) {
             await inject(sessionID, "〔/goal〕请提供目标条件。用法：/goal <条件>")
             return
@@ -763,6 +789,7 @@ export default Plugin.define({
             turns: 0,
             maxTurns,
             maxMinutes,
+            promise,
             startedAt: Date.now(),
             phase: "running",
             lastReason: "",
@@ -773,7 +800,7 @@ export default Plugin.define({
           G.goals.set(sessionID, state)
           persistGoal(state)
           log(
-            `start session=${sessionID} condition=${condition.slice(0, 200)} maxTurns=${maxTurns} maxMinutes=${maxMinutes} replaced=${replaced}`,
+            `start session=${sessionID} condition=${condition.slice(0, 200)} maxTurns=${maxTurns} maxMinutes=${maxMinutes} promise=${promise ?? "-"} replaced=${replaced}`,
           )
           await inject(
             sessionID,
@@ -782,9 +809,12 @@ export default Plugin.define({
               "满足以下条件后本循环自动结束，无需向我确认：",
               condition,
               "",
+              promise ? `当且仅当条件真正满足时，单独一行输出：${promise}（不得为脱身谎报）。` : "",
               "请自主工作：读取文件、运行命令、修改代码均可。每一轮结束时，用可验证的证据（命令输出、文件操作、明确完成说明）说明进展。",
               "你是否完成由外部评估器每轮独立判定，不要自行宣布完成。",
-            ].join("\n"),
+            ]
+              .filter(Boolean)
+              .join("\n"),
           )
         },
       })
