@@ -133,7 +133,7 @@ export OPENCODE_GOAL_LOG_FILE="~/goal.log"
 
 以下结论均在本机 OpenCode V2 上实测得出，部分与官方文档的表述不同：
 
-1. **循环推进用 `session.synthetic` + `delivery:"steer"`**（实测可靠，且不伪造用户消息）。踩过的坑：synthetic **不指定 delivery**（默认入队语义）时，idle 会话存在"入队但不被立即拉取"的窗口，消息滞留到下一次外部消息才被消费（表现为"结论不出现、循环停住"）。显式传 `delivery: "steer"` 后立即触发执行。`session.prompt`（user 语义）也能推进，但会在转录里留下伪造的用户消息，且无法与真实用户输入区分。
+1. **循环推进用 `session.synthetic` + `delivery:"steer"`**（实测可靠，且不伪造用户消息）。踩过的坑：synthetic **不指定 delivery**（默认入队语义）时，idle 会话存在"入队但不被立即拉取"的窗口，消息滞留到下一次外部消息才被消费（表现为"结论不出现、循环停住"）。显式传 `delivery: "steer"` 后立即触发执行。`session.prompt`（user 语义）用于**用户自己的输入**（如 `/goal <条件>` 启动：命令本身不会自动进转录，用它把用户的命令以真实 user 消息留底）；非用户输入（每轮循环指引、状态/结论通知）仍用 synthetic，避免伪造用户消息。**另一个必须踩过的坑**：synthetic **不带 `description` 时界面完全不渲染**——渲染器按 `message.type === "synthetic" && !message.description?.trim()` 直接跳过该消息（TUI `packages/tui/src/routes/session/rows.ts`、Web 会话页 `packages/session-ui/src/timeline/projection.ts` 的 `isNotice`；强制可见仅覆盖 `metadata.state === "error"` 与失败 shell 完成）。渲染时显示的是 `description`（无 metadata 时按 `◈ Notice` 行换行显示），`text` 只在转录数据里。**凡是需要用户看到的注入，`text` 与 `description` 都要传**；只有纯内部机制（如每轮循环指引）才故意省略 `description` 让它保持隐形。
 2. **`ctx.model.list()` 返回 `{ location, data }` 对象，不是数组**，模型列表在 `data`。
 3. **插件事件流是全服务广播**，且同一事件会被重复投递——需按 `event.data.sessionID` 过滤目标会话，并**按 `event.id` 去重**（否则一次 idle 会触发多次评估与注入）。
 4. **`ctx.generate.text` 的 `model` 可省略**（OpenAPI 中为 `Model.Ref | null`），省略时用默认模型。
@@ -146,7 +146,7 @@ export OPENCODE_GOAL_LOG_FILE="~/goal.log"
 - **无默认轮数上限**：对齐 Claude `/goal`（默认不设限），靠无进展检测 + 可选的 `--mins` / `--turns` / `maxTurns` 兜底。若条件写得让模型能一直"用工具但永不满足"，循环可能持续很久——需要时请显式设限。
 - **Esc 中断**：事件处理已实现（`session.execution.interrupted` → 暂停），但未在真实 TUI 中人工验证。
 - **恢复后暂停**：从磁盘恢复的目标**有意置为暂停**（热重载/重启不自动续跑），等你在该会话发消息或 `/goal resume` 才继续。
-- **终态多一轮**：结束/状态类消息以 synthetic 注入，会触发一次模型的简短确认回复（多花一次廉价调用），换来结论必然可见。
+- **终态多一轮**：结束/状态类消息以 synthetic 注入，会触发一次模型的简短确认回复（多花一次廉价调用），换来结论必然可见——**前提是注入带 `description`**（不带则界面不渲染，见实现笔记 1）。每轮循环指引刻意不带 `description`，保持隐形以免长循环刷屏；进度请看模型每轮自己的可见回复，或用 `/goal` 查状态。
 - **单会话单目标**（再次 `/goal` 替换，不叠加）。
 - **完成承诺靠模型自律**：`--promise` 命中即判达成、跳过评估器。模型若在条件未满足时输出承诺串会被误判完成——这是有意取舍（省一次评估），条件请写得让模型无法"以为完成"。
 
