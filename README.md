@@ -158,7 +158,7 @@ export OPENCODE_GOAL_LOG_FILE="~/goal.log"
   1. 合并含版本 bump 的 PR（代码 + CHANGELOG 同步）。
   2. 仓库 **Actions → Release → Run workflow**，填版本号（如 `0.4.0`）。
   3. workflow 自动打 tag `v0.4.0`，随即触发 Release：从 `CHANGELOG.md` 提取该版本条目并创建 GitHub Release。
-- 自动标签（`.github/workflows/labeler.yml`）：`feature/*` → feat、`fix*` → fix、`docs*`/`**/*.md` → docs、`chore*` → chore、`.github/**` → infra。
+- 自动标签（`.github/labeler.yml`，由 `labeler.yml` workflow 驱动）：`feature/*`/`feat*` → feat、`fix*` → fix、`docs*`/`**/*.md` → docs、`chore*` → chore、`.github/**` → infra。分支名前缀是主要判据，命名时请沿用。配置由**默认分支**提供（labeler 在 `pull_request` 下读取 base 的 `labeler.yml`），改动需先合入 `main` 才对后续 PR 生效。
 - Issue / PR 模板：`.github/ISSUE_TEMPLATE/`、`.github/pull_request_template.md`。
 
 ## License
