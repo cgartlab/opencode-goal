@@ -37,6 +37,9 @@ jobs:
             });
 
   release:
+    # 只在 push tag（v*）事件下执行；workflow_dispatch 仅用来打 tag（上面的 tag job），
+    # 打 tag 后会触发新的 push-tag run 在此执行——避免 dispatch run 里 GITHUB_REF 指向 main 制造垃圾 Release
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
       contents: write
