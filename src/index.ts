@@ -377,12 +377,39 @@ export default Plugin.define({
 
     await restoreGoals()
 
-    /** ---- 注入：synthetic + steer（实测可靠，语义干净，不伪造用户消息） ---- */
-    async function inject(sessionID: string, text: string): Promise<void> {
+    /** ---- 注入 ----
+     * 渲染器（TUI rows.ts / session-ui projection.ts）会丢弃**没有 description** 的 synthetic 消息：
+     *   message.type === "synthetic" && !message.description?.trim() → 不建行
+     * 因此需要用户在会话页看到的注入必须带 description（渲染时显示 description、隐藏 text）。
+     */
+    async function injectRaw(sessionID: string, text: string, description?: string): Promise<void> {
+      const input: { sessionID: string; text: string; delivery: "steer" | "queue"; description?: string } = {
+        sessionID,
+        text,
+        delivery: "steer",
+      }
+      if (description !== undefined) input.description = description
       try {
-        await ctx.session.synthetic({ sessionID, text, delivery: "steer" })
+        await ctx.session.synthetic(input)
       } catch (e) {
         log(`inject error session=${sessionID}: ${String(e)}`)
+      }
+    }
+    /** 可见注入：会话页显示 description（默认取正文，可传更简短的标签） */
+    async function inject(sessionID: string, text: string, description?: string): Promise<void> {
+      await injectRaw(sessionID, text, description ?? text)
+    }
+    /** 静默注入：只驱动执行，不出现在会话页（每轮循环指引，避免长循环刷屏） */
+    async function injectSteer(sessionID: string, text: string): Promise<void> {
+      await injectRaw(sessionID, text)
+    }
+    /** 以真实 user 消息提交：用户自己输入的命令应作为用户消息留底（命令本身不会自动进转录），
+     *  而非 synthetic 通知。TUI 提交命令默认 delivery="steer"。 */
+    async function sendPrompt(sessionID: string, text: string, delivery: "steer" | "queue"): Promise<void> {
+      try {
+        await ctx.session.prompt({ sessionID, text, delivery })
+      } catch (e) {
+        log(`prompt error session=${sessionID}: ${String(e)}`)
       }
     }
 
@@ -536,10 +563,10 @@ export default Plugin.define({
           return
         }
 
-        // 继续：注入下一轮
+        // 继续：静默注入下一轮指引（循环内部机制，不占会话页版面）
         g.turns += 1
         persistGoal(g)
-        await inject(
+        await injectSteer(
           sessionID,
           [
             `〔/goal 第 ${g.turns} 轮〕继续推进，直到条件满足。`,
@@ -802,19 +829,20 @@ export default Plugin.define({
           log(
             `start session=${sessionID} condition=${condition.slice(0, 200)} maxTurns=${maxTurns} maxMinutes=${maxMinutes} promise=${promise ?? "-"} replaced=${replaced}`,
           )
-          await inject(
+          // 用真实 user 消息提交：命令本身不会自动进转录，这里替用户留底，会话页能看到自己发的内容
+          await sendPrompt(
             sessionID,
             [
               replaced ? "〔/goal 已替换旧目标〕" : "〔/goal 已启动〕",
               "满足以下条件后本循环自动结束，无需向我确认：",
               condition,
-              "",
               promise ? `当且仅当条件真正满足时，单独一行输出：${promise}（不得为脱身谎报）。` : "",
               "请自主工作：读取文件、运行命令、修改代码均可。每一轮结束时，用可验证的证据（命令输出、文件操作、明确完成说明）说明进展。",
               "你是否完成由外部评估器每轮独立判定，不要自行宣布完成。",
             ]
               .filter(Boolean)
               .join("\n"),
+            input.delivery,
           )
         },
       })

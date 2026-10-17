@@ -5,6 +5,14 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **`/goal` 之后会话页看不到提示词**：OpenCode 渲染器（TUI 与 Web 会话页）会丢弃**没有 `description`** 的 synthetic 消息，而此前 `ctx.session.synthetic` 只传了 `text`——启动/状态/帮助/暂停/恢复/清除/达成/不可满足/预算耗尽等所有注入在界面上一律不显示。现在这些用户可见注入同时携带 `description`（见 README「实现笔记」1）。
+
+### Changed
+
+- `/goal <条件>`（及替换旧目标）改用 `session.prompt` 以真实 user 消息提交：命令本身不会自动进转录，现在会话页能看到自己发的内容（含条件原文）。循环每轮内部指引仍为 synthetic 静默注入（`injectSteer`），长循环不刷屏；进度看模型每轮可见回复，或用 `/goal` 查状态。
+
 ## [0.3.0] - 2026-10-17
 
 ### Added
