@@ -3,17 +3,23 @@
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 约定，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
-## [0.3.1] - 2026-10-18
+## [0.3.1](https://github.com/cgartlab/opencode-goal/compare/v0.3.0...v0.3.1) - 2026-10-18
+
+> **一句话概括**：修复 `/goal` 启动后会话页看不到提示词的问题，并把提示真正记进会话历史。
+> **你需要做什么**：重启 OpenCode 让插件重新加载即可，配置无需改动（若从源码安装则重新复制 `src/index.ts`）。
 
 ### Fixed
 
-- **`/goal` 之后会话页看不到提示词**：OpenCode 渲染器（TUI 与 Web 会话页）会丢弃**没有 `description`** 的 synthetic 消息，而此前 `ctx.session.synthetic` 只传了 `text`——启动/状态/帮助/暂停/恢复/清除/达成/不可满足/预算耗尽等所有注入在界面上一律不显示。现在这些用户可见注入同时携带 `description`（见 README「实现笔记」1）。
+- **`/goal` 之后会话页看不到提示词**：OpenCode 渲染器（TUI 与 Web 会话页）会丢弃**没有 `description`** 的 synthetic 消息，而此前 `ctx.session.synthetic` 只传了 `text`——启动/状态/帮助/暂停/恢复/清除/达成/不可满足/预算耗尽等所有注入在界面上一律不显示。现在这些用户可见注入同时携带 `description`（见 README「实现笔记」1）。修复见 [#5](https://github.com/cgartlab/opencode-goal/pull/5)。
 
 ### Changed
 
 - `/goal <条件>`（及替换旧目标）改用 `session.prompt` 以真实 user 消息提交：命令本身不会自动进转录，现在会话页能看到自己发的内容（含条件原文）。循环每轮内部指引仍为 synthetic 静默注入（`injectSteer`），长循环不刷屏；进度看模型每轮可见回复，或用 `/goal` 查状态。
 
-## [0.3.0] - 2026-10-17
+## [0.3.0](https://github.com/cgartlab/opencode-goal/compare/v0.2.0...v0.3.0) - 2026-10-17
+
+> **一句话概括**：新增完成承诺串 `--promise`，条件满足时可跳过评估器直接判定完成。
+> **你需要做什么**：不需要做任何事；不传 `--promise` 时行为与 0.2.0 完全一致。
 
 ### Added
 
@@ -21,7 +27,10 @@
   跳过评估器（Ralph Wiggum 同款语义）；依赖模型自律，不得为脱身谎报。
 - 持久化与恢复、`/goal resume` 均携带完成承诺设置。
 
-## [0.2.0] - 2026-10-17
+## [0.2.0](https://github.com/cgartlab/opencode-goal/compare/v0.1.0...v0.2.0) - 2026-10-17
+
+> **一句话概括**：对齐 Claude `/goal` 与 Codex Goals 的生命周期——目标可暂停/恢复/清除，且热重载与重启后不丢。
+> **你需要做什么**：从 0.1.0 升级无需改动配置；但注意 0.1.0 的 `/goal stop` 在本版改名为 `/goal clear`（`stop` 仍作为别名保留）。
 
 ### Added
 
@@ -39,7 +48,10 @@
 - 进程内 `globalThis` 单例共享状态，抵御 watcher 重载风暴导致的实例并存。
 - 评估证据窗口可配置（`evidenceWindow`，默认 6）。
 
-## [0.1.0] - 2026-10-16
+## [0.1.0](https://github.com/cgartlab/opencode-goal/tree/v0.1.0) - 2026-10-16
+
+> **一句话概括**：首个版本，把 Claude Code 的 `/goal`（目标型自动迭代循环）搬到 OpenCode V2。
+> **你需要做什么**：这是首个版本，无需升级动作；按 README「安装」创建插件文件即可。
 
 ### Added
 
